@@ -11,6 +11,7 @@ lapply(packages_list, library, character.only = TRUE)
 # Spatial Information Organization (Raster) 10km va a ser más rápido. raster es una grilla. El shp se rasteriza para: (i) shp tienden a ser vectores=pesado, (ii) dificiles de cuantificar por vertices. Mejor raster, es un archivo cuadrado, pixeles, grilla en si mism
 setwd("C:/Users/Clari Mora/Dropbox/PC/Documents")
 dirfile<- "C:/RESULTADOS IPAs_2022/Poligono_Area Estudio_1000 m_UA 10x10km/UA_1000_10x10.shp"
+
 # cargar archivo (llamar el polígono) y transformarlo en raster con coordenadas planas (pasando de geográficas)
 spatial_file<- st_read(dirfile) %>% st_transform(3395)
 
