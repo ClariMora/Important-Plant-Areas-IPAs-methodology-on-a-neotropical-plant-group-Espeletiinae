@@ -7,17 +7,16 @@ rm(list = ls())
 packages_list<-list("data.table", "sp", "sf", "fasterize","raster", "rgdal", "stars", "foreign", "terra", "cli", "vegan", "tidyverse", "scales", "plyr", "fdth", "reshape", "reshape2","ggnewscale","raster", "rgeos", "ggplot2", "tmap", "pryr","base", "maptools", "ggmap", "rnaturalearth", "rnaturalearthdata", "rstudioapi", "magrittr", "pbapply", "rredlist", "grid", "gdalUtilities", "rCAT")
 lapply(packages_list, library, character.only = TRUE)
 
-# El poligono se cortó con capa de DEM de 90 m desde los 1000m
-# Spatial Information Organization (Raster) 10km va a ser más rápido. raster es una grilla. El shp se rasteriza para: (i) shp tienden a ser vectores=pesado, (ii) dificiles de cuantificar por vertices. Mejor raster, es un archivo cuadrado, pixeles, grilla en si mism
+# With the coordinates of the records, the study area is delimited, cutting with a DEM layer of 90m from 1000m
+# With the section of the study area, a grid of 10 km is established
 setwd("C:/Users/Clari Mora/Dropbox/PC/Documents")
 dirfile<- "C:/RESULTADOS IPAs_2022/Poligono_Area Estudio_1000 m_UA 10x10km/UA_1000_10x10.shp"
 
-# cargar archivo (llamar el polígono) y transformarlo en raster con coordenadas planas (pasando de geográficas)
+# Call the study area and transform it into a raster with flat coordinates
 spatial_file<- st_read(dirfile) %>% st_transform(3395)
 
-# una vez cargado, se resteriza el poligono (raster base de trabajo). 
-# Se crea Id nuevo por cada pixel de 10 x 10 km2
-# Sirve paa hacer mapa espacial. Es el raster base
+# Once loaded, the polygon (working base raster) is rasterized. 
+# Creation of identification id for each 10 x 10 km2 pixel
 rasterbase<- raster(extent(spatial_file),crs= paste0("+init=epsg:", 3395), res= 10000 )
 tname3<- tempfile(fileext = ".tif")
 t_file<- writeStart(rasterbase, filename = tname3,  overwrite=T); writeStop(t_file);
