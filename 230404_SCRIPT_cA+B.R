@@ -22,33 +22,31 @@ tname3<- tempfile(fileext = ".tif")
 t_file<- writeStart(rasterbase, filename = tname3,  overwrite=T); writeStop(t_file);
 gdalUtilities::gdal_rasterize(dirfile, tname3, burn=1, at=T)
 
-# generar Id de pixel, de 0 al maximo número. Creación de máscará de área de estudio raster
+# Creating a study area mask
 raster_file<- raster(tname3) %>% {terra::mask(setValues(., seq(ncell(.))), .)} %>% rast
 
-# Copia de la máscara en 4326. Es mas fácil transformar la máscara que todos los datos
+# Transformation of the mask into coordinate system 4326
 area_4326<- raster(raster_file) %>% projectRaster(crs = st_crs(4326)$proj4string, method = "ngb")
 cell_area<- terra::cells(raster_file)
 
+# Generation of study area polygon
 poly =rasterToPolygons(raster(raster_file)) %>% st_as_sf() %>% st_transform (4326) 
 names(poly) [1]="Id"
 st_write(poly, "poligono_pixel_all_ve3.shp")
 
-## Load Data Occ Espeletiinae - cargar datos
+## Loading the records of Espeletiinae
 glob <- read.csv("C:/RESULTADOS IPAs_2022/221103_OCC_SRTM_Copernicus_TNC_Useful_Coord.csv", sep=",", header = TRUE, row.names = NULL, na.strings = "")
 
-# Cruce del poligno versus registros. Asignacion del Id del pixel {is.na = para que no haya NAs}
-# Se reemplada , por . y que se vuelvan númericos (las coordenadas)
-# se crea un Id coord, puede ayudar para el conteo. Son 2 Ids 
+# Crossing the polygon of the study area with registers. Assignment of the pixel id, eliminating the information that does not have NAs 
 glob <- glob %>% 
   mutate(LATITUDE= as.numeric(gsub(",", ".", LATITUDE)), LONGITUD= as.numeric(gsub(",", ".", LONGITUD)), id_coord= group_indices_(., .dots=c("LATITUDE", "LONGITUD")) ) %>%
   dplyr::filter(!is.na(LATITUDE) | !is.na(LONGITUD))
 
-# Cruce de registros espacializados
-# se deben relacionar las columnas con coordenadas
+# Relate records and study area polygon, assign it to coordinate system
 glob_spatial<- glob %>% 
   st_as_sf(coords = c("LONGITUD","LATITUDE"), crs = 4326)
 
-# Visualización puntos
+# Display of records in study area polygon
 plot(glob_spatial[, "geometry"])
 
 # Cruzar mascara con registros con sistema de coordenadas. Cuando hay cruces, se asigna Id. Pero aquellos puntos que no estén con la mascará, eliminar
