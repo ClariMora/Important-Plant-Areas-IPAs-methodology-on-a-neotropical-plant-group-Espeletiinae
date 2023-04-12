@@ -49,29 +49,26 @@ glob_spatial<- glob %>%
 # Display of records in study area polygon
 plot(glob_spatial[, "geometry"])
 
-# Cruzar mascara con registros con sistema de coordenadas. Cuando hay cruces, se asigna Id. Pero aquellos puntos que no estén con la mascará, eliminar
-# Archivo espacial. es un archivo espacial, con ID de cell
-# Convierte en un data frame para usar como tabla, y crea una celda, con el Id pero también funciona para filtrar por mascara
+# Generate a spatial file with the study area coordinate system. "Id" is assigned. It is converted to a data.frame to be used as a table to allow the unions and comparisons of the methodology analysis.
 glob_spatial_mask<- as.data.frame(glob_spatial) %>% mutate(Id= raster::extract(area_4326, glob_spatial) ) %>%
   dplyr::filter(!is.na(Id))  %>%  st_as_sf() %>% st_transform(3395)
 
-# Creación data.frame para manejo de información, en tabla
+# Data.frame creation for information management
 glob_data<- as.data.frame(glob_spatial_mask)
 
-# Conteo de registros por especie (TODOS occ), por pixel diferenciado por coord
-# n_occ_sp: # occ de especie por pixel
-# n_occ_sp_pixel: # occ de sp por pixel. Conteo sp, por pixel y cantidad por pixel (suma de occ / pixel)
-# se asume que cada registro es una coord diferente.:n_distinct: coord diferentes
+# Perform record counts by species and by different coordinate
+# n_occ_sp: # species records per pixel
+# n_occ_sp_pixel: # sp records per pixel. sp count, per pixel, and amount per pixel (sum of records/pixel)
 data_id_sp<- glob_data %>% group_by(Id,name_clean) %>% dplyr::summarise(n_occ_sp_pixel = n_distinct(id_coord))
 
-# Glob data agrupado por nombre de sp, cuantas veces esta la sp en total y por pixel unidos por name_clean
-# sp por Id / pixel, y occ tales sp / Id. #  occ de la sp: cuantas sp hay en total
+# Glob data grouped by sp name, how many times is the sp in total and per pixel joined by name_clean
+# sp by Id/pixel, and occ such sp / Id. # occ of the sp: how many sp are there in total
 data_sp<- data_id_sp %>% group_by(name_clean) %>% dplyr::summarise(n_occ_sp_total = sum(n_occ_sp_pixel))
 
-# Lista de registros totales tanto de ocurrencias, numero de especies por Id/pixel [base análisis]
+# List of total records = records, number of species per Id/pixel [analysis basis].
 data_summ<- list(data_id_sp, data_sp) %>% join_all()
 
-# Exportar resultado
+# Export result
 write.table(data_summ,file="occ_sp_pixel_v2.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 ##############################################################################
