@@ -59,7 +59,7 @@ glob_data<- as.data.frame(glob_spatial_mask)
 # Perform record counts by species and by different coordinate
 # n_occ_sp: # species records per pixel
 # n_occ_sp_pixel: # sp records per pixel. sp count, per pixel, and amount per pixel (sum of records/pixel)
-data_id_sp<- glob_data %>% group_by(Id,name_clean) %>% dplyr::summarise(n_occ_sp_pixel = n_distinct(id_coord))
+data_id_sp<- glob_data %>% group_by(Id,name_clean, PAIS) %>% dplyr::summarise(n_occ_sp_pixel = n_distinct(id_coord))
 
 # Glob data grouped by sp name, how many times is the sp in total and per pixel joined by name_clean
 # sp by Id/pixel, and occ such sp / Id. # occ of the sp: how many sp are there in total
@@ -73,13 +73,11 @@ write.table(data_summ,file="occ_sp_pixel_v2.csv", sep = ",", row.names = TRUE, c
 
 ##############################################################################
 ## CRITERIO cA1: sp GLOBALLY THREATENED
-# El área contiene poblaciones importantes de taxones amenazados globalmente
-# Condicion: al menos el 1% de todos los especímenes registrados por especie amenazada a nivel global se encuentran dentro de un pixel
+# The area contains important populations of globally threatened taxa
+# Condition: at least 1% of all recorded specimens per globally threatened species are within a pixel
 ##############################################################################
 
-# Filtrar por columna de amenazada, bajo columnas de IUCN. Crear vector único con valores requeridos
-# dplyr::filter: que me filtre de la BD grande, las columnas que necesito (con %in% valores que quiero que coja) y creo un vector con las columnas que necesito
-# da el valor de cuantas sp estan amenazadas
+# Filter by threatened column, under IUCN columns. Create unique vector with required values (threat sp)
 glob_sp_IUCN<- dplyr::filter(glob_data, IUCN_RL_CO %in% c("VU", "EN", "CR"))$name_clean %>% unique()
 
 # Conteos bajo Thresholds por especie sobre el total de pixeles ocupados
@@ -118,7 +116,7 @@ poly_cA1 =rasterToPolygons(rastercA1) %>% st_as_sf() %>%
   st_transform(4326)
 
 st_write(poly_cA1, "cA1_evaluado.shp")
-write.table(glob_data_IUCN_1perc_spatial,file="cA1_evaluado.csv", sep = ",", row.names = TRUE, col.names=TRUE)
+write.table(glob_data_IUCN_1perc_spatial,file="cA1_evaluado_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 # extracción de datos con base en las columnas para análisis
 # se filtra por la columna de conteos
@@ -138,7 +136,7 @@ write.table(draft_table_cA1, file="ccA1_organice.csv", sep = ",", row.names = TR
 # a menor puntaje, más importancia de ese pixel.
 # Norm cA1: corresponde a la organización de la columna del ranking, normalizada de llevada a escala de 0 a 1
 
-percent_IUCN_1perc <- glob_data_IUCN_1perc %>% group_by(Id,name_clean) %>%
+percent_IUCN_1perc <- glob_data_IUCN_1perc %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.01) %>%
   mutate(cumple = ifelse (perc_occ >= 0.01, "Yes", "No")) %>%
   split(. $name_clean) %>% 
@@ -146,7 +144,7 @@ percent_IUCN_1perc <- glob_data_IUCN_1perc %>% group_by(Id,name_clean) %>%
            mutate(NormcA1 = ((RankcA1 *100) / sum (. $RankcA1)) / 100)
            ) %>% rbind.fill()
 
-write.table(percent_IUCN_1perc, file="cA1_1perc.csv", sep = ",", row.names = TRUE, col.names=TRUE)
+write.table(percent_IUCN_1perc, file="cA1_1perc_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 ##############################################################################
 ## CRITERION cA3: sp NATIONALLY THREATENED
@@ -209,7 +207,7 @@ write.table(draft_table_cA3, file="ccA3_organice.csv", sep = ",", row.names = TR
 # Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
 # Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
 # ultima columna con normalización de los datos
-percent_country_IUCN_10perc <- country_data_IUCN_10perc %>% group_by(Id,name_clean) %>%
+percent_country_IUCN_10perc <- country_data_IUCN_10perc %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_country = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_country >= 0.1, "Yes", "No")) %>%
   split(. $name_clean) %>% 
@@ -217,7 +215,7 @@ percent_country_IUCN_10perc <- country_data_IUCN_10perc %>% group_by(Id,name_cle
            mutate(NormcA3 = ((RankcA3 *100) / sum (. $RankcA3)) / 100)
   ) %>% rbind.fill()
 
-write.table(percent_country_IUCN_10perc, file="cA3_10perc.csv", sep = ",", row.names = TRUE, col.names=TRUE)
+write.table(percent_country_IUCN_10perc, file="cA3_10perc_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 ##############################################################################
 ##### IUCN EVALUATION - EOO (extension de presencia) y AOO (área de ocupación)
@@ -286,7 +284,7 @@ write.table(draft_table_cA4, file="cA4_EAR_organice.csv", sep = ",", row.names =
 # Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
 # Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
 
-percent_cA4_EAR <- sp_EAR_10perc_pixel %>% group_by(Id,name_clean) %>%
+percent_cA4_EAR <- sp_EAR_10perc_pixel %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_EAR = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_EAR >= 0.1, "Yes", "No")) %>%
   split(. $name_clean) %>% 
@@ -294,7 +292,7 @@ percent_cA4_EAR <- sp_EAR_10perc_pixel %>% group_by(Id,name_clean) %>%
            mutate(NormcA4 = ((RankcA4 *100) / sum (. $RankcA4)) / 100)
   ) %>% rbind.fill()
 
-write.table(percent_cA4_EAR, file="cA4_EAR_result.csv", sep = ",", row.names = TRUE, col.names=TRUE)
+write.table(percent_cA4_EAR, file="cA4_EAR_result_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 
 ##############################################################################
@@ -355,7 +353,7 @@ write.table(draft_table_cA5, file="ccA5_ERR_organice.csv", sep = ",", row.names 
 # Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
 # Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
 
-percent_cA5_ERR <- sp_ERR_10perc_pixel %>% group_by(Id,name_clean) %>%
+percent_cA5_ERR <- sp_ERR_10perc_pixel %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_ERR = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_ERR >= 0.1, "Yes", "No")) %>%
   split(. $name_clean) %>% 
