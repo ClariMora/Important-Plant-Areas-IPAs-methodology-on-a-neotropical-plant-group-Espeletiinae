@@ -80,36 +80,34 @@ write.table(data_summ,file="occ_sp_pixel_v2.csv", sep = ",", row.names = TRUE, c
 # Filter by threatened column, under IUCN columns. Create unique vector with required values (threat sp)
 glob_sp_IUCN<- dplyr::filter(glob_data, IUCN_RL_CO %in% c("VU", "EN", "CR"))$name_clean %>% unique()
 
-# Conteos bajo Thresholds por especie sobre el total de pixeles ocupados
-# Cuántas occ hay por sp en toda la mascará y luego carlcular que % (1%) representa y si clasifican de acuerdo con el umbral
+# Threshold counts per species over total pixels occupied
+# How many occurrences there are per sp in the whole mask and then carlcular that % (1%) represents and if classified according to the threshold
 glob_data_IUCN_1perc<- dplyr::filter(data_summ, name_clean %in% glob_sp_IUCN) %>% 
   mutate(percent= n_occ_sp_pixel/ n_occ_sp_total) %>% ## add nueva columna con el calculo con el % calculado del umbral[mutate]
   dplyr::filter(percent>=0.01)
 
-# por medio de un gropup_by, por pixel Id, cuántas sp con al menos el 1% cumplen para generar un map de distribucion
-# Arroja cada sp
-# n_distict: cuantas sp diferentes hay en el pixel. cA1 # de especpies por pixel.n_occ_sp_pixel: de la especie cuantas veces esta por pixel
+# by a gropup_by, per pixel Id, how many sp with at least 1% meet
 glob_data_IUCN_1perc_spatial <- glob_data_IUCN_1perc %>% group_by(Id) %>% 
   dplyr::summarise(cA1= n_distinct(name_clean), name_clean=name_clean) %>% 
   distinct() %>% list(dplyr::select(data_summ, -n_occ_sp_total)) %>% join_all
 
-# Creacion de tabla con columnas Id pixel, Criterio cA1 y occ por pixel.
+# Creating table with Id pixel, cA1 and occ per pixel columns
 glob_data_IUCN_1perc_spatial_uniques <- dplyr::select(glob_data_IUCN_1perc_spatial, -name_clean) %>% distinct()
 
-# Mapeo de resultado y exportación
+# Mapping of result and export
 rastercA1<- rasterbase
 rastercA1[glob_data_IUCN_1perc_spatial_uniques$Id]<- glob_data_IUCN_1perc_spatial_uniques$cA1
 plot(raster_file, col= "gray")
 plot(rastercA1, add=T)
 names(rastercA1) = "cA1"
 
-# organización información, por pixel y dentro de este cuántas sp y cuántas veces se encuentran. 
-# Columna cA1_v1: cantidad de sp que caen en pixel. 
+# Organization of information, by pixel and within this how many sp and how many times are found
+# Column cA1_v1: amount of sp that are on each pixel
 summ_sp_pixel_cA1 <- split(glob_data_IUCN_1perc_spatial, glob_data_IUCN_1perc_spatial$Id) %>% 
   lapply(function(x) {dplyr::mutate( x[1,], name_clean= paste(x$name_clean, collapse= ";" ) )}) %>%
   rbind.fill()
 
-# Consolidar polígono (shp) y base en csv con información - resultado cA1
+# Consolidate polygon (shp) and csv base with information - cA1 result
 poly_cA1 =rasterToPolygons(rastercA1) %>% st_as_sf() %>% 
   as.data.frame() %>% dplyr::mutate(Id = terra::cells(rast(rastercA1))) %>%
   list(summ_sp_pixel_cA1) %>% join_all() %>% st_as_sf %>%
@@ -118,24 +116,13 @@ poly_cA1 =rasterToPolygons(rastercA1) %>% st_as_sf() %>%
 st_write(poly_cA1, "cA1_evaluado.shp")
 write.table(glob_data_IUCN_1perc_spatial,file="cA1_evaluado_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# extracción de datos con base en las columnas para análisis
-# se filtra por la columna de conteos
-# drop=TRUE: donde no hay nombres, se elimina
-# Visializacion de columna ID pixel por sp hacia la derecha
+# data extraction based on counting columns. Display ID pixel column per sp
 draft_table_cA1 <- dcast(glob_data_IUCN_1perc_spatial, Id ~ name_clean, drop=TRUE, fill = 0, value.var = "n_occ_sp_pixel")
 names(draft_table_cA1)
 write.table(draft_table_cA1, file="ccA1_organice.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# Organización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
-# Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
-# Id: número de pixel en area de estudio
-# name_clean: nombre sp
-# perc_occ: porcentaje umbral (al menos 1%, es decir, igual o mayor)
-# Cumple: si cumple con umbral o no
-# Rank cA1: de cada especie, se saca su total: si cae en un 1 pixel pero esta en 50 se hace una relacion de %. Sobre este % se saca un ranking de los pixeles que más tienen al que menos (escala de 1 en adelante). De este rank, se hace una normalizacion
-# a menor puntaje, más importancia de ese pixel.
-# Norm cA1: corresponde a la organización de la columna del ranking, normalizada de llevada a escala de 0 a 1
-
+# Organization and calculation of table percentages by Id and occ by species, for each pixel. 
+# Rank: corresponds to the organization of the ranking column, standardized from carried to scale of 0 to 1
 percent_IUCN_1perc <- glob_data_IUCN_1perc %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.01) %>%
   mutate(cumple = ifelse (perc_occ >= 0.01, "Yes", "No")) %>%
