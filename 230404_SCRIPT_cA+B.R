@@ -135,65 +135,62 @@ write.table(percent_IUCN_1perc, file="cA1_1perc_vf.csv", sep = ",", row.names = 
 
 ##############################################################################
 ## CRITERION cA3: sp NATIONALLY THREATENED
-# El área contiene poblaciones importantes de taxones amenazados nacionalmente
-# Condicion: al menos el 10% de todos los especímenes registrados por especie amenazada en el país, se encuentran dentro de un pixel
+# The area contains significant populations of nationally threatened taxa
+# Condition: at least 10% of all the specimens registered by threatened species in the country, are within a pixel
 ##############################################################################
 
-# Filtrar por columna de amenazada, por país por valor de IUCN. Crear vector único con valores requeridos
-# a cada elemento por pais, se filtra por categoria
-
+# Filter by column of threatened, by country by IUCN value. Create unique vector with required values
 country_sp_IUCN <- split(glob_data, glob_data$PAIS) %>% 
   lapply(function(x) dplyr::filter(x, GEPC_Natio %in% c("VU", "EN", "CR"))$name_clean) %>%
   unlist() %>% unique()
 
-# saber cuáles son las sp que de lo global, no están en lo nacional (es informativo)
+# know which are the sp that of the global, are not in the national (it is informative)
 sp_global_no_country <- glob_sp_IUCN %>% {.[!. %in% country_sp_IUCN]}
 sp_coutry_no_global <- country_sp_IUCN %>% {.[!. %in% glob_sp_IUCN]}
 
-# Conteos bajo Thresholds por especie sobre el total de pixeles ocupados
-# Cuántas occ hay por sp en toda la mascara y luego carlcular que % (10%) representa y si clasifican de acuerdo con el umbral
+# Counts under Thresholds by species over the total number of occupied pixels
+# How many occ are there per sp in the whole mask and then calculate what % (10%) represents and if they classify according to the threshold
 country_data_IUCN_10perc <- dplyr::filter(data_summ, name_clean %in% country_sp_IUCN) %>% 
   mutate(percent= n_occ_sp_pixel/ n_occ_sp_total) %>%
   dplyr::filter(percent>=0.1)
 
-# por medio de un gropup_by, por las columnas Id, cuántas sp con al menos el 1% cumplen para generar un map de distribucion
+# by means of a groupup_by, by the Id columns, how many sp with at least 1% meet to generate a distribution map
 country_data_IUCN_10perc_spatial <- country_data_IUCN_10perc %>% group_by(Id) %>% 
   dplyr::summarise(cA3= n_distinct(name_clean), name_clean=name_clean) %>% 
   distinct() %>% list(dplyr::select(data_summ, - n_occ_sp_total)) %>% join_all
 
-# Creacion de tabla con columnas Id pixel, Criterio cA3 y occ por pixel.
+# Creation of a table with columns Id pixel, Criteria cA3 and occ per pixel.
 country_data_IUCN_10perc_spatial_uniques <- dplyr::select(country_data_IUCN_10perc_spatial, -name_clean) %>% distinct()
 
-# Mapeo de resultado y exportación
+# Result mapping and export
 rastercA3<- rasterbase
 rastercA3[country_data_IUCN_10perc_spatial_uniques$Id]<- country_data_IUCN_10perc_spatial_uniques$cA3
 plot (raster_file, col= "gray")
 plot(rastercA3)
 names(rastercA3) = "cA3"
 
-# organización información, por pixel y dentro de este cuántas sp y cuántas veces se encuentran.
-# Columna cA3: cantidad de sp que caen en pixel.
+# organization information, per pixel and within it how many sp and how many times they are found.
+# Column cA3: amount of sp that fall in pixel.
 summ_sp_pixel_cA3 <- split(country_data_IUCN_10perc_spatial, country_data_IUCN_10perc_spatial$Id) %>% 
   lapply(function(x) {dplyr::mutate( x[1,], name_clean= paste(x$name_clean, collapse= ";" ) )})  %>%
   rbind.fill()
 
-# Consolidar polígono (shp) y base en csv con información - resultado cA3
+# Consolidate polygon (shp) and base in csv with information - cA3 result
 poly_cA3 =rasterToPolygons(rastercA3) %>% st_as_sf() %>% 
   as.data.frame() %>% dplyr::mutate(Id = terra::cells(rast(rastercA3))) %>%
   list(summ_sp_pixel_cA3) %>% join_all() %>% st_as_sf %>%
   st_transform(4326)
 
-# Exportar
+# Export
 st_write(poly_cA3, "cA3_evaluado.shp")
 write.table(country_data_IUCN_10perc_spatial,file="ccA3_evaluado.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# extracción de datos con base en las columnas para análisis
+# column-based data extraction for analysis
 draft_table_cA3 <- dcast(country_data_IUCN_10perc_spatial, Id ~ name_clean, drop=TRUE, fill = 0, value.var = "n_occ_sp_pixel")
 write.table(draft_table_cA3, file="ccA3_organice.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
-# Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
-# ultima columna con normalización de los datos
+# Organization and calculation of table percentages organized by Id and occ by species, for each sp in each pixel
+# Percentage, organization of the % (high and low: Sort by %), data normalization (scale 0 to 1)
 percent_country_IUCN_10perc <- country_data_IUCN_10perc %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_country = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_country >= 0.1, "Yes", "No")) %>%
@@ -205,38 +202,36 @@ percent_country_IUCN_10perc <- country_data_IUCN_10perc %>% group_by(Id,name_cle
 write.table(percent_country_IUCN_10perc, file="cA3_10perc_vf.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
 ##############################################################################
-##### IUCN EVALUATION - EOO (extension de presencia) y AOO (área de ocupación)
+##### IUCN EVALUATION - EOO (extent of presence) and AOO (area of occupancy)
 #############################################################################
 
-# BD insumo inical [glob <- read.csv(system.file("extdata", "221103_OCC_SRTM_Copernicus_TNC_Useful_Coord.csv")] filtrar por columna de sp y coord
+# DB initial input [glob <- read.csv(system.file("extdata", "221103_OCC_SRTM_Copernicus_TNC_Useful_Coord.csv")] filter by column of sp and coord
 occ <-data.frame(taxa=glob$name_clean, lat=glob$LATITUDE,long=glob$LONGITUD)
 
-# Resultado de calculo de EOO y AOO, asignacion de categoria IUCN
+# Result of EOO and AOO calculation, IUCN category assignment
 resultsdfCat_IUCN <- ConBatch(occ,cellsize = 2000,"km", FALSE)
 
 ##############################################################################
 ##### CRITERIO cA4: occ EAR
-# El área contiene poblaciones importantes de taxones endémicos (o casi endémicos) de rango altamente restringico (EAR)
-# Condiciones: (i) Una especie EAR es aquella cuya extensión de ocurrencia es igual o menor a 100 km2; (ii) al menos el 10% de cada especie en rango EAR se encuentra en un pixel
+# The area contains important populations of endemic (or near-endemic) taxa of highly restricted range (EAR)
+# Conditions: (i) An EAR species is one whose extent of occurrence is equal to or less than 100 km2; (ii) at least 10% of each species in EAR range is found in a pixel
 ##############################################################################
 
 EOO_EAR = resultsdfCat_IUCN %>% dplyr::mutate(EOOkm2 = as.numeric(EOOkm2))
 sp_EAR <- EOO_EAR %>% dplyr::filter (EOOkm2 <= 100)
 View(sp_EAR)
 
-# Calculo de cuántas hay por pixel y filtrarlo por columna de sp. y con la condicion de EAR
-# SUMM= RESUMEN
+# Calculate how many there are per pixel and filter by column of sp. and with the condition of EAR
 sp_EAR_summ <- dplyr::filter(data_summ, name_clean %in% sp_EAR$taxa)
 write.table(sp_EAR_summ,file="sp_EAR_cA4.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# Calculo de umbral. Sacar frecuencias relativas al menor el 10% de todas las occ de sp
+# Threshold calculation. Extract relative frequencies to the lesser 10% of all the occ of sp
 sp_EAR_10perc <- sp_EAR_summ %>% group_by(Id) %>% 
   mutate(percent = n_occ_sp_pixel / n_occ_sp_total) %>% 
   dplyr::filter(percent >= 0.1)
 view(sp_EAR_10perc)
 
-# Pixel, # occ, % que representan
-# Se añade un filtro extra: cA4
+# pixel, # occ, % representing. Add an extra filter: cA4
 sp_EAR_10perc_pixel <- sp_EAR_10perc %>% list(sp_EAR_summ) %>% join_all %>% group_by(Id) %>% 
   dplyr:: mutate(cA4 = n_distinct(name_clean), name_clean = name_clean) %>% 
   distinct() %>% list (dplyr::select(data_summ, - n_occ_sp_total)) %>% join_all
@@ -268,9 +263,9 @@ draft_table_cA4 <- dcast(sp_EAR_10perc_pixel, Id ~ name_clean, drop=TRUE, fill =
 
 write.table(draft_table_cA4, file="cA4_EAR_organice.csv", sep = ",", row.names = TRUE, col.names = TRUE)
 
-# Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
-# Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
 
+# Organization and calculation of table percentages organized by Id and occ by species, for each sp in each pixel
+# Percentage, organization of the % (high and low: Sort by %), data normalization (scale 0 to 1)
 percent_cA4_EAR <- sp_EAR_10perc_pixel %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_EAR = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_EAR >= 0.1, "Yes", "No")) %>%
@@ -284,29 +279,27 @@ write.table(percent_cA4_EAR, file="cA4_EAR_result_vf.csv", sep = ",", row.names 
 
 ##############################################################################
 ##### CRITERIO cA5: occ ERR
-# El área contiene poblaciones importantes de taxones endémicos (o casi endémicos) de rango restringico (ERR)
-# Condiciones: (i) Una especie ERR es aquella cuya extensión de ocurrencia es mayor de 100 km2 pero igual o menor de 5000 km2; (ii) al menos el 10% de cada especie en rango ERR se encuentra en un pixel
+# The area contains important populations of endemic (or near-endemic) taxa of restricted range (ERR)
+# Conditions: (i) An ERR species is one whose extent of occurrence is greater than 100 km2 but equal to or less than 5000 km2; (ii) at least 10% of each species in ERR range is found in a pixel
 ##############################################################################
 
 EOO_ERR = resultsdfCat_IUCN %>% dplyr::mutate ( ( (EOOkm2 > 100) & (EOOkm2 <= 5000) ) )
 sp_ERR <- EOO_EAR %>% dplyr::filter (EOOkm2 <= 100)
 View(sp_ERR)
 
-# Calculo de cuántas hay por pixel y filtrarlo por columna de sp. y con la condicion de EAR
-# SUMM= RESUMEN
+# Calculate how many there are per pixel and filter by column of sp. and with the condition of EAR
 sp_ERR_summ <- dplyr::filter(data_summ, name_clean %in% sp_ERR$taxa)
 
 # n_ERR = unique(sp_ERR_data_summ$name_clean) %>% length()
 sp_ERR_occ = unique(sp_ERR$name_clean) %>% length()
 
-# Calculo de umbral. Sacar frecuencias relativas al menor el 10% de todas las occ de sp
+# Threshold calculation. Extract relative frequencies to the lesser 10% of all the occ of sp
 sp_ERR_10perc <- sp_ERR_summ %>% group_by(Id) %>% 
   mutate(percent= n_occ_sp_pixel/n_occ_sp_total) %>% 
   dplyr::filter(percent >= 0.1)
 view(sp_ERR_10perc)
 
-# Pixel, # occ, % que representan
-# Se añade un filtro extra: cA5
+# pixel, # occ, % representing. Add an extra filter: cA5
 sp_ERR_10perc_pixel <- sp_ERR_10perc %>% list(sp_ERR_summ) %>% join_all %>% group_by(Id) %>%
   dplyr::mutate(cA5= n_distinct(name_clean), name_clean= name_clean) %>% 
   distinct() %>% list(dplyr::select(data_summ, - n_occ_sp_total)) %>% join_all
@@ -337,9 +330,8 @@ write.table(sp_ERR_10perc_pix,file="cA5_evaluado_ERR.csv", sep = ",", row.names 
 draft_table_cA5 <- dcast(sp_ERR_10perc_pixel, Id ~ name_clean, drop=TRUE, fill = 0, value.var = "n_occ_sp_pixel")
 write.table(draft_table_cA5, file="ccA5_ERR_organice.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# Ogranización y cálculo de Porcentajes de tabla organizada por Id y occ por especie, por cada sp en cada pixel
-# Porcentaje, organizacion de los % (altos y bajos:Sort by %), normalizacion de datos (escala 0 a 1)
-
+# Organization and calculation of table percentages organized by Id and occ by species, for each sp in each pixel
+# Percentage, organization of the % (high and low: Sort by %), data normalization (scale 0 to 1)
 percent_cA5_ERR <- sp_ERR_10perc_pixel %>% group_by(Id,name_clean, PAIS) %>%
   dplyr::summarise(perc_occ_ERR = n_occ_sp_pixel/ n_occ_sp_total, threshold = n_occ_sp_total * 0.1) %>%
   mutate(cumple = ifelse (perc_occ_ERR >= 0.1, "Yes", "No")) %>%
@@ -352,72 +344,60 @@ write.table(percent_cA5_ERR, file="cA5_ERR_result.csv", sep = ",", row.names = T
 
 ########################
 # CRITERIO B
-# B1:El área tiene la más alta riqueza estimada de plantas y hongos nativos en ese tipo de ecosistema
+# B1: The area has the highest estimated richness of native plants and fungi in that type of ecosystem
 #######################
 
-#creación archivo temporal
+# create temporary file
 tname_ecosystm <- tempfile(fileext = ".tif")
 
-# se utiliza rasterbase creado previamente con los Id de pixel
+# previously created rasterbase is used with the pixel ids
 t_file<- writeStart(rasterbase, filename = tname_ecosystm,  overwrite=T); writeStop(t_file);
 
-# Importar capa de ecosistemas
-# Informacion Ecosistema: Sayre, R., 2022, World Terrestrial Ecosystems (WTE) 2020
+# Import ecosystem layer: Sayre, R., 2022, World Terrestrial Ecosystems (WTE) 2020
 # U.S. Geological Survey data release, https://doi.org/10.5066/P9DO61LP.io
 dir_ecosystems<- "C:/Users/Clari Mora/Dropbox/PC/Desktop/202210_BackUp_Info Clara/Doctorado/ESPELETIA/ArcGIS Insumos/230201_World Ecosystem SHP/World_Ecosystem.shp"
 
-# rasterizar. No hay que convertir sistema de coord, rasterize lo hace
-# gridcode: es el Id de capa de ecosistemas para unir con ecossitemas
+# rasterize
 gdalUtilities::gdal_rasterize(dir_ecosystems, tname_ecosystm,  at=T, a= "gridcode")
 
-# reemplazar shp por dbd
+# replace shp with dbd
 library(foreign)
 data_ecosystems<- read.dbf(gsub(".shp", ".dbf", dir_ecosystems))[, c("gridcode", "W_Ecosystm")] %>% distinct()
 
-# rasterizacion de capa
+# layer rasterization
 rast_ecosystems<- rast(tname_ecosystm)
 
-# convertir capa en tabla (disminuir gasto computacional)
-# rast ecosystem: capa rasterizada
-# terra:cell: que diga cuales celdas tienen valores - raster paquete base, terra segunda version de raster
-# se debe poner gridcode: para que haga la unión 
-# a que celda corresponde cada grid code (de mi sistema de pixeles)
-# que llame las dos columnas de interés de mi sistema de grilla y ecosistemas. doy a pixeles el valor de gridcode. Id nunca cambia
+# convert layer to table (reduce computational expense)
+# rast ecosystem: raster layer
+# terra:cell: tell which cells have values - raster base package, terra second version of raster
+# you must put gridcode: so that it does the union
+# which cell corresponds to each grid code (of my pixel system)
+# call the two columns of interest from my grid system and ecosystems. I give pixels the value of gridcode. id never change
 table_ecosystems <- as.data.frame(rast_ecosystems) %>% setNames("gridcode") %>% mutate(Id= terra::cells(rast_ecosystems)) %>%
   list(data_ecosystems, data_summ) %>% join_all()
 
-# quitar los NA de aquellas sp que que no caen en algun ecosistema
-# sp por ecosistema
-# nsp_ numero de especues por pixel
+# remove the NAs of those sp that do not fall into any ecosystem
+# sp per ecosystem per UA
 sp_ecosystems <-table_ecosystems %>% dplyr::filter(!is.na(name_clean)) %>% 
   group_by(W_Ecosystm) %>% dplyr::summarise(nsp_ecosystem= n_distinct(name_clean))
 
-# calculo de cuantos occ hay por ecosistemas: cuantos distintas sp hay
+# calculation of how many occ there are by ecosystems: how many different sp there are
 sp_pixel <- table_ecosystems %>% group_by(Id) %>% dplyr::summarise(nsp_pixel= n_distinct(name_clean), W_Ecosystm=W_Ecosystm)
 
-# listado ecosisema, # sp por pixel y por ecosistema: este es para hacer el join entr informacion de sp y ecosistemas
-# # de sp por pixel y # sp por ecosistema
-# tenemos riqueza real y proyectada y todos aquellos ecosistemas que tengan mas de 50% que se repoyectan : se aceptan (quitando 3, 2 1, registros)
-# no se filta por un numero especifico, por que sería arbitrario
+# ecosystem listing, # sp per pixel and per ecosystem: this is to join sp and ecosystem information
+# we have real and projected wealth and all those ecosystems that have more than 50% that are reprojected: they are accepted (removing 3, 2 1, records)
+# don't filter by a specific number, because that would be arbitrary
 sp_pixel_ecosystem <- list(sp_ecosystems, sp_pixel) %>% join_all() %>% mutate(perc= nsp_pixel/ nsp_ecosystem) %>%
   dplyr::filter()
 
 write.table(sp_pixel_ecosystem,file="sp_pixel_W_Ecosystm_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)
 
-# que parta en listados de especices por ecosistema
-# de los que tienen sp
-# cuando se cargan cosas con factor, existen como 0, enton rescribir factor con los valores que si quedaron
-#unique indica cuales son los ecosistemas
+# partition species listings by ecosystem for those with sp
 list_ecosystems <- dplyr::filter(table_ecosystems, W_Ecosystm %in% unique(sp_ecosystems$W_Ecosystm) ) %>% 
   dplyr::mutate(W_Ecosystm= factor(W_Ecosystm)) %>% 
   split(.$W_Ecosystm)
 
-# riqueza estimada por ecosistema
-# chao: cuantos podrian existir
-# se borran los NAs
-# SPECIES: REPRSENTATIVIDAD: DEBERIA DECIR CUANTO DA ESPECIES EN CHAO
-# > 1 sobre especies, filtrando por que haya mas de 1 especie. Por que cuando chao daba igual a 1, daba NA en tabla
-# chao siempre dará por ecosistema no por pixel
+# Calculation of Chao (estimated wealth) by ecosystem.
 chao_ecosystems<- lapply(list_ecosystems, function(x){ print(unique(x$W_Ecosystm))
   
   tryCatch({
@@ -433,15 +413,14 @@ chao_ecosystems<- lapply(list_ecosystems, function(x){ print(unique(x$W_Ecosystm
 write.csv(chao_ecosystems, file="sp_chao_ecosystems_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)   
 
 ###################
-## CRITERIO B2
-# B2:Aquella/s  área/s  con  riqueza  estimada  de  plantas  complementaria  a  B1,  de  manera  que  en  conjunto sumen el 10% de la biodiversidad total del ecosistema
-# Condición cB2: cuando  la AIP seleccionada por el criterio B1 contenga el 10% o  más  de  la riqueza total estimada para el tipo de ecosistema, no será necesaria la aplicación del criterio B2.
+## CRITERION B2
+# B2: That area/s with an estimated richness of plants complementary to B1, so that together they add up to 10% of the total biodiversity of the ecosystem
+# Condition cB2: when the AIP selected by criterion B1 contains 10% or more of the total richness estimated for the type of ecosystem, the application of criterion B2 will not be necessary.
 ##################
 
-# columna repres: que representatividad tiene el pixel respecto al total: # sp / en todo el ecosistema = indice chao
-# ceiling: para redondear decimales, sino da unidad completa
-# todo lo que tenga mas del 10% será b2
-# los que tienen NAs no los está calculando. Se borra de name_clean no se tendrá en cuenta
+# column "repres": how representative is the pixel with respect to the total: # sp / in the entire ecosystem (Chao1)
+# ceiling: to round decimals, otherwise give full units
+# everything with more than 10% will be cB2
 chao_richness<- data.frame(chao_ecosystem= chao_ecosystems$chao, W_Ecosystm= chao_ecosystems$W_Ecosystm) %>%
   list(table_ecosystems) %>% join_all() %>% group_by(Id) %>%
   dplyr::filter(!is.na(name_clean)) %>% 
@@ -450,30 +429,29 @@ chao_richness<- data.frame(chao_ecosystem= chao_ecosystems$chao, W_Ecosystm= cha
   dplyr::mutate(B2= ifelse(repres>=0.1, "SI", NA))
 
 
-# pixels con representatividad > del 10%
-# visualiza tabla con chao, Id, name_clean, occ, sp_pixel, representatividad de acuerdo con chao, y columna de si cumple B2
+# pixels with representativeness > 10%
+# display table with bye, Id, name_clean, occ, sp_pixel, representativeness according to bye, and column if it complies with B2
 B2_pixel<- dplyr::filter(chao_richness, !is.na(B2)) %>%  data.frame()
 write.csv(B2_pixel, file = "cB2_complementario.csv")
 
-# Salida de mapa cB2, los complementarios
-# parto de una riqueza estimada por ecosistema, se indica que esos son los pixeles más importantes por ecosistma por los datos que tienen
-# Representación como valores de riqueza: sp_pixel
+# cB2 map output
+# starting from an estimated richness per ecosystem, it is indicated that these are the most important pixels per ecosystem due to the data they have
+# Representation as richness values: sp_pixel
 rastercB2<- rasterbase
 rastercB2[B2_pixel$Id]<- B2_pixel$sp_pixel
 plot(rastercB2)
 writeRaster(rastercB2, "rastercB2.tif")
 
-# para sacar los mapas
-# stars: potearlo mejor. Para mejorar visualización
+# Maps
 stars_B2 <- stars::st_as_stars(rastercB2)
 data_B2<- as.data.frame(stars_B2) %>% dplyr::filter(!is.na(layer)) 
 
-# Exportar como puntos 
+# Export points 
 points_B2<- data_B2 %>% mutate(lat= y , long= x) %>%  st_as_sf(coords =c("long", "lat"), crs = 3395) %>% st_transform(4326)
 st_write(points_B2, "points_B2.shp")
 
 
-# Mapa de salida con resultados de cB2
+# Output map with cB2 results
   gg_Figb2<- ggplot() + geom_stars(data = stars_altitude, na.rm=T) + 
   scale_fill_gradient2(low = "white", high = "gray10", mid="gray", midpoint =3000, na.value = NA, guide = "none") + 
   geom_polygon(data = join_adm2, aes(x = long, y = lat, group = group), color = "gray0", fill = NA) + 
