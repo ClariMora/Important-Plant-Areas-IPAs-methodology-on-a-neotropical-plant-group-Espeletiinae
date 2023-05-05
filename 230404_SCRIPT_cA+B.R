@@ -442,29 +442,5 @@ rastercB2<- rasterbase
 rastercB2[B2_pixel$Id]<- B2_pixel$sp_pixel
 plot(rastercB2)
 writeRaster(rastercB2, "rastercB2.tif")
-
-# Maps
-stars_B2 <- stars::st_as_stars(rastercB2)
-data_B2<- as.data.frame(stars_B2) %>% dplyr::filter(!is.na(layer)) 
-
-# Export points 
-points_B2<- data_B2 %>% mutate(lat= y , long= x) %>%  st_as_sf(coords =c("long", "lat"), crs = 3395) %>% st_transform(4326)
-st_write(points_B2, "points_B2.shp")
-
-
-# Output map with cB2 results
-  gg_Figb2<- ggplot() + geom_stars(data = stars_altitude, na.rm=T) + 
-  scale_fill_gradient2(low = "white", high = "gray10", mid="gray", midpoint =3000, na.value = NA, guide = "none") + 
-  geom_polygon(data = join_adm2, aes(x = long, y = lat, group = group), color = "gray0", fill = NA) + 
-  new_scale_fill() +
-  geom_point(data= data_B2, aes(x=x, y=y,color=layer, size=layer), alpha= 0.5, shape= 15)+
-  scale_color_distiller(palette= "Spectral",breaks = seq(max(data_B2$layer)), "Número de\ndetonantes",  guide = guide_legend())+
-  scale_size_continuous(breaks = seq(max(data_B2$layer)), "Número de\ndetonantes")+
-  coord_fixed(xlim = ext_Andes[1:2], ylim = ext_Andes[3:4] )+
-  theme_void()+
-  theme(legend.position = "bottom", text = element_text(size = 10))+
-  labs(x = "Longitude", y = "Latitude", title = "Número de detonantes\ncB2 por IPA potencial")
-
-write.table(chao_richness, file="chao_richness_W_Ecosystm_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)
-write.csv(sp_ecosystems, file="sp_ecosystems_W_Ecosystm_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)                                                                    
+                                                                 
 
