@@ -140,6 +140,7 @@ write.table(percent_IUCN_1perc, file="cA1_1perc_vf.csv", sep = ",", row.names = 
 ##############################################################################
 
 # Filter by column of threatened, by country by IUCN value. Create unique vector with required values
+
 country_sp_IUCN <- split(glob_data, glob_data$PAIS) %>% 
   lapply(function(x) dplyr::filter(x, GEPC_Natio %in% c("VU", "EN", "CR"))$name_clean) %>%
   unlist() %>% unique()
@@ -385,7 +386,7 @@ sp_ecosystems <-table_ecosystems %>% dplyr::filter(!is.na(name_clean)) %>%
 sp_pixel <- table_ecosystems %>% group_by(Id) %>% dplyr::summarise(nsp_pixel= n_distinct(name_clean), W_Ecosystm=W_Ecosystm)
 
 # ecosystem listing, # sp per pixel and per ecosystem: this is to join sp and ecosystem information
-# we have real and projected wealth and all those ecosystems that have more than 50% that are reprojected: they are accepted (removing 3, 2 1, records)
+# we have real and projected richness and all those ecosystems that have more than 50% that are reprojected: they are accepted (removing 3, 2 1, records)
 # don't filter by a specific number, because that would be arbitrary
 sp_pixel_ecosystem <- list(sp_ecosystems, sp_pixel) %>% join_all() %>% mutate(perc= nsp_pixel/ nsp_ecosystem) %>%
   dplyr::filter()
@@ -397,7 +398,7 @@ list_ecosystems <- dplyr::filter(table_ecosystems, W_Ecosystm %in% unique(sp_eco
   dplyr::mutate(W_Ecosystm= factor(W_Ecosystm)) %>% 
   split(.$W_Ecosystm)
 
-# Calculation of Chao (estimated wealth) by ecosystem.
+# Calculation of Chao (estimated richness) by ecosystem.
 chao_ecosystems<- lapply(list_ecosystems, function(x){ print(unique(x$W_Ecosystm))
   
   tryCatch({
