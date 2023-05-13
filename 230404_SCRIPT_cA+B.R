@@ -32,7 +32,7 @@ cell_area<- terra::cells(raster_file)
 # Generation of study area polygon
 poly =rasterToPolygons(raster(raster_file)) %>% st_as_sf() %>% st_transform (4326) 
 names(poly) [1]="Id"
-st_write(poly, "poligono_pixel_all_ve3.shp")
+st_write(poly, "poligono_pixel_all_v4.shp")
 
 ## Loading the records of Espeletiinae
 glob <- read.csv("C:/RESULTADOS IPAs_2022/221103_OCC_SRTM_Copernicus_TNC_Useful_Coord.csv", sep=",", header = TRUE, row.names = NULL, na.strings = "")
@@ -167,7 +167,7 @@ country_data_IUCN_10perc_spatial_uniques <- dplyr::select(country_data_IUCN_10pe
 rastercA3<- rasterbase
 rastercA3[country_data_IUCN_10perc_spatial_uniques$Id]<- country_data_IUCN_10perc_spatial_uniques$cA3
 plot (raster_file, col= "gray")
-plot(rastercA3)
+plot(rastercA3, add=T)
 names(rastercA3) = "cA3"
 
 # organization information, per pixel and within it how many sp and how many times they are found.
@@ -208,6 +208,7 @@ write.table(percent_country_IUCN_10perc, file="cA3_10perc_vf.csv", sep = ",", ro
 
 # DB initial input [glob <- read.csv(system.file("extdata", "221103_OCC_SRTM_Copernicus_TNC_Useful_Coord.csv")] filter by column of sp and coord
 occ <-data.frame(taxa=glob$name_clean, lat=glob$LATITUDE,long=glob$LONGITUD)
+
 
 # Result of EOO and AOO calculation, IUCN category assignment
 resultsdfCat_IUCN <- ConBatch(occ,cellsize = 2000,"km", FALSE)
@@ -411,6 +412,9 @@ chao_ecosystems<- lapply(list_ecosystems, function(x){ print(unique(x$W_Ecosystm
   
 }) %>% rbind.fill() %>% mutate(repres= Species/chao) %>% dplyr::filter(Species>1)
 
+
+
+
 write.csv(chao_ecosystems, file="sp_chao_ecosystems_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)   
 
 ###################
@@ -435,12 +439,31 @@ chao_richness<- data.frame(chao_ecosystem= chao_ecosystems$chao, W_Ecosystm= cha
 B2_pixel<- dplyr::filter(chao_richness, !is.na(B2)) %>%  data.frame()
 write.csv(B2_pixel, file = "cB2_complementario.csv")
 
+
 # cB2 map output
 # starting from an estimated richness per ecosystem, it is indicated that these are the most important pixels per ecosystem due to the data they have
 # Representation as richness values: sp_pixel
 rastercB2<- rasterbase
 rastercB2[B2_pixel$Id]<- B2_pixel$sp_pixel
-plot(rastercB2)
-writeRaster(rastercB2, "rastercB2.tif")
-                                                                 
+plot(rastercB2, add=T)
+writeRaster(rastercB2, "rastercB2.tif", overwrite= T)
+
+
+### Mapa por ecosistema
+aa<- B2_pixel %>%dplyr:: group_by(Id) %>% dplyr::summarise(n= n_distinct(W_Ecosystm)) # pixels unicos por ecosistema
+rasterEcosystem<- rasterbase
+rasterEcosystem[B2_pixel$Id]<- B2_pixel$gridcode
+
+match_id<- dplyr::select(B2_pixel, c("Id", "gridcode")) %>% distinct()
+
+# raster a poligono
+poly_ecosystems<- rasterToPolygons(rasterEcosystem) %>% st_as_sf() %>% dplyr::filter(!is.na(layer)) %>% dplyr::mutate(gridcode= layer) %>% 
+  as.data.frame() %>% list(match_id) %>% join_all() %>% list(B2_pixel) %>% join_all()  %>%
+  dplyr::select(c("Id", "gridcode", "chao_ecosystem", "W_Ecosystm", "name_clean", "geometry")) %>%  distinct() %>% st_as_sf()
+
+st_write(poly_ecosystems, "pixels_ecosystems_spv5.shp")
+
+write.csv(st_drop_geometry(poly_ecosystems), "pixels_ecosystems_spv5.csv")
+
+
 
