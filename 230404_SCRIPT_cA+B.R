@@ -213,6 +213,8 @@ occ <-data.frame(taxa=glob$name_clean, lat=glob$LATITUDE,long=glob$LONGITUD)
 # Result of EOO and AOO calculation, IUCN category assignment
 resultsdfCat_IUCN <- ConBatch(occ,cellsize = 2000,"km", FALSE)
 
+write.table(resultsdfCat_IUCN, file="results_IUCN.csv", sep = ",", row.names = TRUE, col.names=TRUE)
+
 ##############################################################################
 ##### CRITERIO cA4: occ EAR
 # The area contains important populations of endemic (or near-endemic) taxa of highly restricted range (EAR)
