@@ -415,8 +415,6 @@ chao_ecosystems<- lapply(list_ecosystems, function(x){ print(unique(x$W_Ecosystm
 }) %>% rbind.fill() %>% mutate(repres= Species/chao) %>% dplyr::filter(Species>1)
 
 
-
-
 write.csv(chao_ecosystems, file="sp_chao_ecosystems_v1.csv", sep = ",", row.names = TRUE, col.names=TRUE)   
 
 ###################
@@ -452,9 +450,9 @@ writeRaster(rastercB2, "rastercB2.tif", overwrite= T)
 
 
 ### Mapa por ecosistema
-aa<- B2_pixel %>%dplyr:: group_by(Id) %>% dplyr::summarise(n= n_distinct(W_Ecosystm)) # pixels unicos por ecosistema
-rasterEcosystem<- rasterbase
-rasterEcosystem[B2_pixel$Id]<- B2_pixel$gridcode
+aa <- B2_pixel %>%dplyr:: group_by(Id) %>% dplyr::summarise(n= n_distinct(W_Ecosystm)) # pixels unicos por ecosistema
+rasterEcosystem<- rasterbase 
+rasterEcosystem[B2_pixel$Id]<- B2_pixel$gridcode #crear raster con grid code
 
 match_id<- dplyr::select(B2_pixel, c("Id", "gridcode")) %>% distinct()
 
@@ -466,6 +464,4 @@ poly_ecosystems<- rasterToPolygons(rasterEcosystem) %>% st_as_sf() %>% dplyr::fi
 st_write(poly_ecosystems, "pixels_ecosystems_spv5.shp")
 
 write.csv(st_drop_geometry(poly_ecosystems), "pixels_ecosystems_spv5.csv")
-
-
 
